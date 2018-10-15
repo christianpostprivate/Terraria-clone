@@ -11,8 +11,8 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (100, 180, 0)
-DARKGREEN = (10, 140, 0)
-LIGHTGREEN = (150, 255, 100, 130)
+DARKGREEN = (60, 150, 0)
+LIGHTGREEN = (150, 255, 150, 130)
 BLUE = (0, 50, 170)
 
 GRAVITY = 0.6
@@ -88,19 +88,22 @@ class Block(pg.sprite.Sprite):
          surface.blit(self.image, self.rect.topleft)
          
          
+         
 class Grid:
-    def __init__(self, width, height):
+    def __init__(self, game, width, height):
+        self.game = game
         self.width = width
         self.height = height
         self.blocks = [[None for i in range(width)] for j in range(height)]
     
     
-    def add(self, block):
-        grid_x = int(block.pos.x // TILESIZE)
-        grid_y = int(block.pos.y // TILESIZE)
+    def add(self, pos):
+        grid_x = int(pos.x // TILESIZE)
+        grid_y = int(pos.y // TILESIZE)
         if self.blocks[grid_y][grid_x] == None:
+            b = Block(self.game, pos.x, pos.y)
             print('added at', grid_x, grid_y)
-            self.blocks[grid_y][grid_x] = block
+            self.blocks[grid_y][grid_x] = b
             
     
     def remove_at(self, pos):
@@ -161,16 +164,18 @@ class Game:
         
         self.tiles_w = WIDTH // TILESIZE
         self.tiles_h = HEIGHT // TILESIZE
-        self.grid = Grid(self.tiles_w, self.tiles_h)
+        self.grid = Grid(self, self.tiles_w, self.tiles_h)
         
         self.blocks = pg.sprite.Group()
         # add bottom row
         for i in range(self.tiles_w):
-            b = Block(self, i * TILESIZE, HEIGHT - TILESIZE)
-            self.grid.add(b)
+            pos = vec(i * TILESIZE, HEIGHT - TILESIZE)
+            self.grid.add(pos)
 
     
     def update(self):
+        pg.display.set_caption(str(len(self.blocks)))
+        
         self.p.update(self.blocks)
         
         self.m_pos = vec(pg.mouse.get_pos())
@@ -181,14 +186,12 @@ class Game:
         self.block_pos.x = (self.p.pos.x + self.p_to_mouse.x) // TILESIZE * TILESIZE
         self.block_pos.y = (self.p.pos.y + self.p_to_mouse.y) // TILESIZE * TILESIZE
         
-        if self.mouseclickedleft:
-            b = Block(self, self.block_pos.x, self.block_pos.y)
-            self.grid.add(b)
+        if self.mouseclickedleft:         
+            self.grid.add(self.block_pos)
         
         if self.mouseclickedright:
             self.grid.remove_at(self.block_pos)
-        
-        
+         
         self.mouseclickedleft = False
         self.mouseclickedright = False
         
@@ -237,24 +240,25 @@ class Game:
 
 
     def run(self):
-        try:
-            # game loop
-            self.running = True 
-            while self.running:
-                self.clock.tick(60)
-        
-                self.events()
-                
-                self.update()
-                self.draw()
+        # game loop
+        self.running = True 
+        while self.running:
+            self.clock.tick(60)
     
-            pg.quit()
-        except Exception:
-            traceback.print_exc()
-            pg.quit()
+            self.events()
+            
+            self.update()
+            self.draw()
+
+        pg.quit()
    
     
     
-if __name__ == '__main__':         
-    game = Game()
-    game.run()
+if __name__ == '__main__':
+    try:       
+        game = Game()
+        game.run()
+    
+    except Exception:
+        traceback.print_exc()
+        pg.quit()
