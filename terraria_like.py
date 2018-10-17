@@ -2,11 +2,12 @@ import pygame as pg
 import traceback
 from random import random, choice
 
-SCREEN_WIDTH = 400
-SCREEN_HEIGHT = 300
-SCREEN_SCALE = 2
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+SCREEN_SCALE = 1
 
 TILESIZE = 20
+TILESIZE_SQUARED = TILESIZE ** 2
 MAP_WIDTH = 80 * TILESIZE
 MAP_HEIGHT = 60 * TILESIZE
 
@@ -217,27 +218,33 @@ class Block(pg.sprite.Sprite):
                     self.age = 0
         
         if self.type == 'sand':
-            self.acc = vec(0, GRAVITY) * self.weight
-            
-            self.vel += self.acc  
-            self.pos += self.vel + 0.5 * self.acc
-            
-            blocks = self.game.blocks
-            self.rect.left = self.pos.x
-            collide(self, blocks, 'x')
-            self.rect.top = self.pos.y
-            collide(self, blocks, 'y')       
-            self.rect.topleft = self.pos
-            if self.vel.length_squared() == 0:
-                self.state = 'STATIC'
+            if (self.grid.get_at(vec(self.pos.x, self.pos.y + TILESIZE))
+                and self.state == 'STATIC'):
+                return
             else:
+                self.acc = vec(0, GRAVITY) * self.weight
+                
+                self.vel += self.acc  
+                if self.vel.length_squared() >= TILESIZE_SQUARED:
+                    self.vel.scale_to_length(TILESIZE - 1)
+                self.pos += self.vel + 0.5 * self.acc
+                
+                blocks = self.game.blocks
+                self.rect.left = self.pos.x
+                collide(self, blocks, 'x')
+                self.rect.top = self.pos.y
+                collide(self, blocks, 'y')       
+                self.rect.topleft = self.pos
+                if self.vel.length_squared() == 0:
+                    self.state = 'STATIC'
+                else:
+                    if self.state == 'STATIC':
+                        self.game.grid.remove_at(self.pos)
+                        self.state = 'MOVING'
+                
                 if self.state == 'STATIC':
-                    self.game.grid.remove_at(self.pos)
-                    self.state = 'MOVING'
-            
-            if self.state == 'STATIC':
-                if not self.game.grid.get_at(self.pos):
-                    self.game.grid.block_add(self.pos, self)
+                    if not self.game.grid.get_at(self.pos):
+                        self.game.grid.block_add(self.pos, self)
                         
             
          
@@ -533,7 +540,7 @@ class Game:
         
         # ------- debugging!
         #self.player.inventory['dirt'] = 999
-        self.player.inventory['sand'] = 20
+        self.player.inventory['sand'] = 99
         
     
     def find_spawn_position(self):
