@@ -14,9 +14,11 @@ SCREEN_SCALE = 2
 
 TILESIZE = 16
 TILESIZE_SQUARED = TILESIZE ** 2
-MAP_WIDTH = 340 * TILESIZE
-MAP_HEIGHT = 80 * TILESIZE
+MAP_WIDTH = 3000 * TILESIZE
+MAP_HEIGHT = 60 * TILESIZE
 GUI_HEIGHT = 3 * TILESIZE
+SECTOR_SIZE = 20
+NO_OF_SECTORS = MAP_WIDTH // (SECTOR_SIZE * TILESIZE)
 
 vec = pg.math.Vector2
 
@@ -140,7 +142,7 @@ class Physics_object(pg.sprite.Sprite):
         self.vel += self.acc
         pos_change = self.vel + 0.5 * self.acc
         if pos_change.length_squared() >= TILESIZE_SQUARED:
-            pos_change.scale_to_length(TILESIZE_SQUARED - 1)
+            pos_change.scale_to_length(TILESIZE - 1)
         self.pos += pos_change
         # collision detection
         self.rect.left = self.pos.x
@@ -361,7 +363,8 @@ class Grid:
         self.game = game
         self.width = width
         self.height = height
-        self.map = [[False for i in range(width)] for j in range(height)]
+        self.map_blueprint = [[None for i in range(width)] for j in range(height)]
+        self.map = [[None for i in range(width)] for j in range(height)]
         
         self.death_limit = 3
         self.birth_limit = 4
@@ -370,6 +373,8 @@ class Grid:
         self.treasure_limit = 5
         
         self.horizon = 20
+        
+        self.sector = 0
         
     
     def generate(self):
@@ -386,23 +391,23 @@ class Grid:
         for y in range(self.horizon, self.height - 1):
             for x in range(self.width):
                 if random() < placement_chance:
-                    self.map[y][x] = True
+                    self.map_blueprint[y][x] = 'dirt'
                     
         for i in range(self.no_of_steps):
-            self.map = self.simulation_step(self.map)
+            self.map_blueprint = self.simulation_step(self.map_blueprint)
         
-        # place block or None
-        for y in range(self.height - 1):
+
+        # erase sky
+        for y in range(self.horizon):
             for x in range(self.width):
-                if y < self.horizon:
-                    self.map[y][x] = None
-                else:
-                    if self.map[y][x]:
-                        pos_x = x * TILESIZE
-                        pos_y = y * TILESIZE
-                        self.map[y][x] = Block(self.game, 'dirt', pos_x, pos_y)
-                    else:
-                        self.map[y][x] = None
+                self.map_blueprint[y][x] = None
+                
+        # place solid blocks around the map
+        for y in range(self.height):
+            self.map_blueprint[y][0] = 'stone'
+            self.map_blueprint[y][self.width - 1] = 'stone'
+        for x in range(self.width):
+            self.map_blueprint[self.height - 1][x] = 'stone'
     
     
     def simulation_step(self, old_map):
@@ -412,16 +417,16 @@ class Grid:
             for x in range(self.width):
                 nbs = self.count_alive_neighbors(old_map, x, y)
                 
-                if old_map[y][x]:
+                if old_map[y][x] == 'dirt':
                     if nbs < self.death_limit:
-                        new_map[y][x] = False
+                        new_map[y][x] = None
                     else:
-                        new_map[y][x] = True
+                        new_map[y][x] = 'dirt'
                 else:
                     if nbs < self.birth_limit:
-                        new_map[y][x] = False
+                        new_map[y][x] = None
                     else:
-                        new_map[y][x] = True
+                        new_map[y][x] = 'dirt'
         return new_map
                           
     
@@ -447,24 +452,88 @@ class Grid:
         # no block above
         for y in range(1, self.height - 1):
             for x in range(1, self.width - 1):
-                if (self.map[y][x] != None 
-                        and self.map[y - 1][x] == None
-                        and self.map[y + 1][x] != None):
-                    pos_x = x * TILESIZE
-                    pos_y = y * TILESIZE
-                    self.map[y][x].kill()
-                    self.map[y][x] = Block(self.game, 'grass', pos_x, pos_y)
+                if (self.map_blueprint[y][x] != None 
+                        and self.map_blueprint[y - 1][x] == None
+                        and self.map_blueprint[y + 1][x] != None):
+                    self.map_blueprint[y][x] = 'grass'
                     
     
     def place_treasure(self):
         for y in range(1, self.height - 1):
             for x in range(1, self.width - 1):
-                if self.map[y][x] == None:
-                    nbs = self.count_alive_neighbors(self.map, x, y)
+                if self.map_blueprint[y][x] == None:
+                    nbs = self.count_alive_neighbors(self.map_blueprint, x, y)
                     if nbs >= self.treasure_limit:
-                        pos_x = x * TILESIZE
-                        pos_y = y * TILESIZE
-                        self.map[y][x] = Block(self.game, 'ore', pos_x, pos_y)
+                        self.map_blueprint[y][x] = 'ore'
+    
+    
+    def manage_blocks_initial(self):
+        player = self.game.player
+        self.sector = int((player.pos.x / MAP_WIDTH) * NO_OF_SECTORS)
+        for i in range(self.width):
+            # load sector the player is in
+            # and the ones left and right
+            if (i >= (self.sector - 1) * SECTOR_SIZE 
+                and i < (self.sector + 2) * SECTOR_SIZE):
+                for j in range(self.height):
+                    if self.map_blueprint[j][i]:
+                        b_x = int(i * TILESIZE)
+                        b_y = int(j * TILESIZE)
+                        self.map[j][i] = Block(self.game, 
+                                self.map_blueprint[j][i], b_x, b_y)
+    
+    
+    def manage_blocks(self):
+        '''
+        creates and deletes blocks around the players FOV
+        '''                    
+        # load blocks
+        player = self.game.player
+        # calculating the sector the player is in
+        change = 0
+        sector = int((player.pos.x / MAP_WIDTH) * NO_OF_SECTORS)
+        if sector != self.sector:
+            change = sector - self.sector
+            self.sector = sector
+        
+        if change != 0:
+            # load blocks in sector
+            for i in range(self.width):
+                if change == 1:
+                    # load sector the player is going to
+                    if (i >= (self.sector + 1) * SECTOR_SIZE 
+                        and i < (self.sector + 2) * SECTOR_SIZE):
+                        for j in range(self.height - 1):
+                            if self.map_blueprint[j][i]:
+                                b_x = int(i * TILESIZE)
+                                b_y = int(j * TILESIZE)
+                                self.map[j][i] = Block(self.game, 
+                                        self.map_blueprint[j][i], b_x, b_y)
+                    
+                    # unload the sector the player is leaving
+                    if (i < (self.sector - 1) * SECTOR_SIZE):
+                        for j in range(self.height):
+                            if self.map[j][i]:
+                                self.map[j][i].kill()
+                                self.map[j][i] = None
+                                
+                elif change == -1:           
+                    # load sector the player is going to
+                    if (i < self.sector * SECTOR_SIZE 
+                        and i >= (self.sector - 1) * SECTOR_SIZE):
+                        for j in range(self.height):
+                            if self.map_blueprint[j][i]:
+                                b_x = int(i * TILESIZE)
+                                b_y = int(j * TILESIZE)
+                                self.map[j][i] = Block(self.game, 
+                                        self.map_blueprint[j][i], b_x, b_y)
+                    
+                    # unload the sector the player is leaving
+                    if (i >= (self.sector + 2) * SECTOR_SIZE):
+                        for j in range(self.height):
+                            if self.map[j][i]:
+                                self.map[j][i].kill()
+                                self.map[j][i] = None
                     
     
     def add(self, pos, type_):
@@ -474,7 +543,8 @@ class Grid:
             b = Block(self.game, type_, pos.x, pos.y)
             self.map[grid_y][grid_x] = b
             
-    def set(self, pos, type_):
+            
+    def set_at(self, pos, type_):
         grid_x = int(pos.x // TILESIZE)
         grid_y = int(pos.y // TILESIZE)
         b = Block(self.game, type_, pos.x, pos.y)
@@ -534,7 +604,7 @@ class GUI:
         self.rect = self.surf.get_rect()
         self.pos = vec(0, SCREEN_HEIGHT)
         self.rect.topleft = self.pos 
-        self.font = pg.font.SysFont('Arial', 18)
+        self.font = pg.font.SysFont('Arial', 12)
     
     
     def draw(self):
@@ -610,7 +680,7 @@ class Game:
         self.block_pos = vec(0, 0)
         
         self.all_sprites = pg.sprite.Group()
-        self.blocks = pg.sprite.Group()
+        self.blocks = pg.sprite.Group()            
         self.drops = pg.sprite.Group()
         
         self.tiles_w = MAP_WIDTH // TILESIZE
@@ -619,13 +689,8 @@ class Game:
         self.grid.generate()
         self.grid.place_treasure()    
         self.grid.place_grass()
-
-        # add bottom row
-        for i in range(self.tiles_w):
-            pos = vec(i * TILESIZE, MAP_HEIGHT - TILESIZE)
-            self.grid.set(pos, 'stone')
             
-        self.background = pg.Surface((MAP_WIDTH, MAP_HEIGHT))
+        self.background = pg.Surface((SECTOR_SIZE * TILESIZE * 3, MAP_HEIGHT))
         self.background_rect = self.background.get_rect()
         self.background.fill(SKYBLUE)
         
@@ -634,48 +699,51 @@ class Game:
         self.player = Player(self, spawn_pos.x, spawn_pos.y)
         self.gui = GUI(self)
         self.camera = Camera(MAP_WIDTH, MAP_HEIGHT)
-           
+        
+        self.grid.manage_blocks_initial()
+
         
         # ------- debugging!
-        #self.player.inventory['dirt'] = 999
+        self.player.inventory['dirt'] = 99
         self.player.inventory['sand'] = 99
         
     
     def find_spawn_position(self):
         spawn_positions = []
         # find empty position:
-        for i in range(1, self.grid.height - 1):
+        for i in range(1, self.grid.horizon):
             for j in range(1, self.grid.width - 1):
-                if (self.grid.map[i][j] == None 
-                        and self.grid.map[i - 1][j] == None
-                        and self.grid.map[i + 1][j] != None):
+                if (self.grid.map_blueprint[i][j] == None 
+                        and self.grid.map_blueprint[i - 1][j] == None
+                        and self.grid.map_blueprint[i + 1][j] != None):
                     spawn_positions.append(vec(j * TILESIZE, i * TILESIZE))
         return choice(spawn_positions)
     
     
     def save_world_image(self):
-        surf = pg.Surface((self.grid.width, self.grid.height))
+        surf = pg.Surface((self.grid.width * 4, self.grid.height * 4))
         surf.fill(LIGHTBLUE)
         for i in range(self.grid.height):
             for j in range(self.grid.width):
-                if self.grid.map[i][j]:
-                    color = BLOCK_TYPES[self.grid.map[i][j].type]['color']
-                    pg.draw.rect(surf, color, ((j, i), (1, 1)))
+                if self.grid.map_blueprint[i][j]:
+                    color = BLOCK_TYPES[self.grid.map_blueprint[i][j]]['color']
+                    pg.draw.rect(surf, color, ((j * 4, i * 4), (4, 4)))
         
         pg.image.save(surf, 'world.png')
                 
 
     
     def update(self):
-        pg.display.set_caption(str(round(self.clock.get_fps(), 2)))
+        self.grid.manage_blocks()
+        
+        caption = ('Sector: ' + str(self.grid.sector) 
+            + ' | ' + str(len(self.all_sprites)) + ' sprites | FPS: ' 
+            + str(round(self.clock.get_fps(), 2)))
+        
+        pg.display.set_caption(caption)
 
         for sprite in self.all_sprites:
-             if (abs(sprite.pos.x - self.player.pos.x) < 
-                    (SCREEN_WIDTH // 2 + TILESIZE) and
-               (abs(sprite.pos.y - self.player.pos.y)) <
-                    SCREEN_HEIGHT):
-                    # only update what's on the screen
-                    sprite.update()          
+            sprite.update()          
         self.camera.update(self.player)
 
         self.m_pos = vec(pg.mouse.get_pos())
@@ -691,25 +759,22 @@ class Game:
                             self.p_to_mouse.x) // TILESIZE * TILESIZE
         self.block_pos.y = (self.player.rect.centery + 
                             self.p_to_mouse.y) // TILESIZE * TILESIZE
-        self.block_pos.y = min(self.block_pos.y, MAP_HEIGHT - TILESIZE)
-         
+        self.block_pos.y = min(self.block_pos.y, MAP_HEIGHT - TILESIZE)   
+
         self.mouseclickedleft = False
         self.mouseclickedright = False
         
         
+        
     def draw(self):
+        self.background_rect.centerx = self.player.rect.centerx
         self.screen.blit(self.background, self.camera.apply_rect(self.background_rect))
         
         # get the rect position of the player on the screen
         rect = self.camera.apply(self.player)
         
         for sprite in self.all_sprites:
-            if (abs(sprite.pos.x - self.player.pos.x) < (
-                    SCREEN_WIDTH // 2 + TILESIZE) and
-               (abs(sprite.pos.y - self.player.pos.y)) < (
-                    SCREEN_HEIGHT // 2 + TILESIZE)):
-                # only blit what's on the screen
-                self.screen.blit(sprite.image, self.camera.apply(sprite))
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
 
         # draw a line from player to mouse
         pg.draw.line(self.screen, BLACK, rect.center, 
