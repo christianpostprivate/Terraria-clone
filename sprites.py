@@ -141,7 +141,7 @@ class Block(Physics_object):
                                              self.pos.y + st.TILESIZE)) == None):
                 self.age += 1
                 if self.age >= 600:
-                    self.type = 'grass'
+                    #self.type = 'grass'
                     self.image.fill(st.BLOCK_TYPES[self.type]['color'])
                     self.age = 0
         
@@ -264,10 +264,10 @@ class GUI:
             
     
     def draw_loading_screen(self):
-        self.game.screen.fill(st.RED)
+        self.game.screen.fill(st.BLACK)
         step = self.game.grid.step - 1
-        pct = str(round(step / self.game.grid.no_of_steps, 2))
-        text = 'Loading world map: {0}%  '.format(pct) + '|||||' * step
+        pct = int(step / self.game.grid.no_of_steps * 100)
+        text = 'Creating world map: %4d %% '% pct + '|||||' * step + '     ' * (5 - step) + '|'
         text_surf = self.font.render(text, False, st.WHITE)
         self.game.screen.blit(text_surf,
                               (st.SCREEN_WIDTH // 4, st.SCREEN_HEIGHT // 2))

@@ -14,8 +14,7 @@ To Do list:
     - quad trees for collision
     - mini map
     - collide function with only 1 spritecollide call
-    - loading screen
-
+    - draw sector lines for debugging
 '''
 
 vec = pg.math.Vector2
@@ -43,12 +42,9 @@ class Game:
         self.tiles_w = st.MAP_WIDTH // st.TILESIZE
         self.tiles_h =st.MAP_HEIGHT // st.TILESIZE
         self.grid = fn.Grid(self, self.tiles_w, self.tiles_h)
-        #self.grid.generate()
-        #self.grid.place_treasure()    
-        #self.grid.place_grass()
-            
-        self.background = pg.Surface((st.SECTOR_SIZE * st.TILESIZE * 3, 
-                                      st.MAP_HEIGHT))
+
+        self.background = pg.Surface((st.SECTOR_WIDTH * st.TILESIZE * 10 , 
+                                      st.SECTOR_HEIGHT * st.TILESIZE * 10))
         self.background_rect = self.background.get_rect()
         self.background.fill(st.SKYBLUE)
         
@@ -66,8 +62,7 @@ class Game:
         self.grid.manage_blocks_initial()
         
         # quadtree stuff
-        self.qt_rect = pg.Rect(0, 0, 
-                            int(1.5 * st.SECTOR_SIZE) * st.TILESIZE, st.MAP_HEIGHT)
+        self.qt_rect = pg.Rect(0, 0, 40 * st.TILESIZE, 60 * st.TILESIZE)
         
         self.started = True
       
@@ -104,7 +99,8 @@ class Game:
     def update(self):
         self.grid.manage_blocks()
         
-        caption = ('Sector: ' + str(self.grid.sector) 
+        caption = ('Sector_w: ' + str(self.grid.sector_w)
+            + '  Sector_h: ' + str(self.grid.sector_h)
             + ' | ' + str(len(self.all_sprites)) + ' sprites | FPS: ' 
             + str(round(self.clock.get_fps(), 2)))
         
@@ -173,10 +169,25 @@ class Game:
         block_rect.topleft = self.block_pos
         self.screen.blit(block_surf, self.camera.apply_rect(block_rect))
         
+        # draw quadtree rects
         #for rect in self.qtree_rects:
             #pg.draw.rect(self.screen, (0, 255, 0), rect, 1)
 
         #pg.draw.rect(self.screen, (0, 255, 0), self.camera.apply_rect(self.qt_rect), 2)
+        
+        # draw the sector boundaries
+        sector_xs = [x * st.SECTOR_WIDTH * st.TILESIZE for x in range(st.NO_SECTORS_W)]
+        sector_ys = [y * st.SECTOR_HEIGHT * st.TILESIZE for y in range(st.NO_SECTORS_H)]
+        
+        for x in sector_xs:
+            start = self.camera.apply_point_reverse((x, 0))
+            end = self.camera.apply_point_reverse((x, st.MAP_HEIGHT))
+            pg.draw.line(self.screen, st.GREEN, start, end)
+            
+        for y in sector_ys:
+            start = self.camera.apply_point_reverse((0, y))
+            end = self.camera.apply_point_reverse((st.MAP_WIDTH, y))
+            pg.draw.line(self.screen, st.GREEN, start, end)
         
         
         self.gui.draw()
