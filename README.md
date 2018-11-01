@@ -7,5 +7,5 @@ Controls:
 - SPACE: Jump
 - Mouse left: place block
 - Mouse right: mine block
-- R: toggle inventory
+- R: select blocks in inventory
 
