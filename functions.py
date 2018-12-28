@@ -63,11 +63,13 @@ class Grid:
         self.map_blueprint = [[None for i in range(width)] for j in range(height)]
         self.map = [[None for i in range(width)] for j in range(height)]
         
+        self.placement_chance = 0.40
         self.death_limit = 3
         self.birth_limit = 4
-        self.no_of_steps = 5
+        self.no_of_steps = 7
         self.done = False
         self.step = 0
+        self.step_small = 0
         
         self.treasure_limit = 5
         # height in tiles that are only sky        
@@ -88,11 +90,10 @@ class Grid:
             string = ('Loading map: ' + str(self.step) + ' / ' + str(self.no_of_steps))
             pg.display.set_caption(string)
         if self.step == 0:
-            placement_chance = 0.38
             
             for y in range(self.horizon, self.height - 1):
                 for x in range(self.width):
-                    if random() < placement_chance:
+                    if random() < self.placement_chance:
                         self.map_blueprint[y][x] = 'dirt'
                     
             self.step += 1
@@ -117,6 +118,8 @@ class Grid:
             self.place_grass()
             self.place_treasure()
             self.done = True
+            
+            print(self.step_small)
     
     
     def simulation_step(self, old_map):
@@ -124,6 +127,7 @@ class Grid:
                       for y in range(self.height)]       
         for y in range(self.height):
             for x in range(self.width):
+                self.step_small += 1
                 nbs = self.count_alive_neighbors(old_map, x, y)
                 
                 if old_map[y][x] == 'dirt':
@@ -216,33 +220,41 @@ class Grid:
         if sector_h != self.sector_h:
             change_h = sector_h - self.sector_h
             self.sector_h = sector_h
+        
+        # define boundaries for looping through the grid
+        start_w = max(0, (self.sector_w - 2) * st.SECTOR_WIDTH)
+        stop_w = min((self.sector_w + 3) * st.SECTOR_WIDTH, self.width)
+        start_h = max(0, (self.sector_h - 2) * st.SECTOR_HEIGHT)
+        stop_h = min((self.sector_h + 3) * st.SECTOR_HEIGHT, self.height)
 
         if change_w != 0:
             # if the player went to a different sector horizontally
             # load blocks in sector based on direction
-            # MEMO: THIS IS TOO MUCH CODE!!!!
-            for i in range(self.width):
+            # MEMO: THIS IS TOO MUCH CODE!?!?   
+            for i in range(start_w, stop_w):
                 if change_w == 1:
                     # player went right
                     # load sector the player is going to
                     if (i >= (self.sector_w + 1) * st.SECTOR_WIDTH and 
                         i < (self.sector_w + 2) * st.SECTOR_WIDTH):
-                        for j in range(self.height): 
+                        
+                        for j in range(start_h, stop_h): 
                             if (j >= (self.sector_h - 1) * st.SECTOR_HEIGHT 
                                 and j < (self.sector_h + 2) * st.SECTOR_HEIGHT):
                                 if self.map_blueprint[j][i]:
                                     b_x = int(i * st.TILESIZE)
                                     b_y = int(j * st.TILESIZE)
-                                    # place block sprites
+                                    # place block sprite
                                     self.map[j][i] = spr.Block(self.game, 
                                             self.map_blueprint[j][i], b_x, b_y)
 
                     # unload the sector the player is leaving
                     if (i < (self.sector_w - 1) * st.SECTOR_WIDTH):
-                        for j in range(self.height):
+                        for j in range(start_h, stop_h):
                             if (j >= (self.sector_h - 1) * st.SECTOR_HEIGHT 
                                 and j < (self.sector_h + 2) * st.SECTOR_HEIGHT):
                                 if self.map[j][i]:
+                                    # remove block sprite
                                     self.map[j][i].kill()
                                     self.map[j][i] = None
                                 
@@ -251,48 +263,51 @@ class Grid:
                     # load sector the player is going to
                     if (i < self.sector_w * st.SECTOR_WIDTH and 
                         i >= (self.sector_w - 1) * st.SECTOR_WIDTH):
-                        for j in range(self.height):
+                        
+                        for j in range(start_h, stop_h):
                             if (j >= (self.sector_h - 1) * st.SECTOR_HEIGHT 
                                 and j < (self.sector_h + 2) * st.SECTOR_HEIGHT):
                                 if self.map_blueprint[j][i]:
                                     b_x = int(i * st.TILESIZE)
                                     b_y = int(j * st.TILESIZE)
-                                    # place block sprites
+                                    # place block sprite
                                     self.map[j][i] = spr.Block(self.game, 
                                             self.map_blueprint[j][i], b_x, b_y)
                                 
                     # unload the sector the player is leaving
                     if (i >= (self.sector_w + 2) * st.SECTOR_WIDTH):
-                        for j in range(self.height):
+                        for j in range(start_h, stop_h):
                             if (j >= (self.sector_h - 1) * st.SECTOR_HEIGHT 
                                 and j < (self.sector_h + 2) * st.SECTOR_HEIGHT):
                                 if self.map[j][i]:
+                                    # remove block sprite
                                     self.map[j][i].kill()
                                     self.map[j][i] = None
-                       
+    
         if change_h != 0:
-            for i in range(self.width):
+            for i in range(start_w, stop_w):
                 if change_h == 1:
                     # player went down
                     # load sector the player is going to
                     if (i >= (self.sector_w - 1) * st.SECTOR_WIDTH and 
                         i < (self.sector_w + 2) * st.SECTOR_WIDTH):
-                        for j in range(self.height): 
+                        for j in range(start_h, stop_h): 
                             if (j >= (self.sector_h + 1) * st.SECTOR_HEIGHT 
                                 and j < (self.sector_h + 2) * st.SECTOR_HEIGHT):
                                 if self.map_blueprint[j][i]:
                                     b_x = int(i * st.TILESIZE)
                                     b_y = int(j * st.TILESIZE)
-                                    # place block sprites
+                                    # place block sprite
                                     self.map[j][i] = spr.Block(self.game, 
                                             self.map_blueprint[j][i], b_x, b_y)
 
                             # unload the sector the player is leaving
                             if (j < (self.sector_h - 1) * st.SECTOR_HEIGHT):
-                                for k in range(self.width):
-                                    if (i >= (self.sector_w - 1) * st.SECTOR_WIDTH and 
-                                        i < (self.sector_w + 2) * st.SECTOR_WIDTH):
+                                for k in range(start_w, stop_w):
+                                    if (k >= (self.sector_w - 1) * st.SECTOR_WIDTH and 
+                                        k < (self.sector_w + 2) * st.SECTOR_WIDTH):
                                         if self.map[j][k]:
+                                            # remove block sprite
                                             self.map[j][k].kill()
                                             self.map[j][k] = None
                 
@@ -301,25 +316,26 @@ class Grid:
                     # load sector the player is going to
                     if (i >= (self.sector_w - 1) * st.SECTOR_WIDTH and 
                         i < (self.sector_w + 2) * st.SECTOR_WIDTH):
-                        for j in range(self.height): 
+                        for j in range(start_h, stop_h):  
                             if (j >= (self.sector_h - 1) * st.SECTOR_HEIGHT 
                                 and j < self.sector_h * st.SECTOR_HEIGHT):
                                 if self.map_blueprint[j][i]:
                                     b_x = int(i * st.TILESIZE)
                                     b_y = int(j * st.TILESIZE)
-                                    # place block sprites
+                                    # place block sprite
                                     self.map[j][i] = spr.Block(self.game, 
                                             self.map_blueprint[j][i], b_x, b_y)
 
                             # unload the sector the player is leaving
                             if (j >= (self.sector_h + 2) * st.SECTOR_HEIGHT):
-                                for k in range(self.width):
-                                    if (i >= (self.sector_w - 1) * st.SECTOR_WIDTH and 
-                                        i < (self.sector_w + 2) * st.SECTOR_WIDTH):
+                                for k in range(start_w, stop_w):
+                                    if (k >= (self.sector_w - 1) * st.SECTOR_WIDTH and 
+                                        k < (self.sector_w + 2) * st.SECTOR_WIDTH):
                                         if self.map[j][k]:
+                                            # remove block sprite
                                             self.map[j][k].kill()
                                             self.map[j][k] = None
-                                
+
     
     def add(self, pos, type_):
         grid_x = int(pos.x // st.TILESIZE)
@@ -491,3 +507,4 @@ class Quadtree:
             self.northeast.draw(screen)
             self.southwest.draw(screen)
             self.southeast.draw(screen)
+            

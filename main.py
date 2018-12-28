@@ -14,7 +14,6 @@ To Do list:
     - quad trees for collision
     - mini map
     - collide function with only 1 spritecollide call
-    - draw sector lines for debugging
 '''
 
 vec = pg.math.Vector2
@@ -34,6 +33,7 @@ class Game:
         self.mouseclickedleft = False
         self.mouseclickedright = False
         self.block_pos = vec(0, 0)
+
         
         self.all_sprites = pg.sprite.Group()
         self.blocks = pg.sprite.Group()            
@@ -93,6 +93,22 @@ class Game:
                     pg.draw.rect(surf, color, ((j * 4, i * 4), (4, 4)))
         
         pg.image.save(surf, 'world.png')
+        
+    
+    def draw_sectors(self):
+        # draw the sector boundaries
+        sector_xs = [x * st.SECTOR_WIDTH * st.TILESIZE for x in range(st.NO_SECTORS_W)]
+        sector_ys = [y * st.SECTOR_HEIGHT * st.TILESIZE for y in range(st.NO_SECTORS_H)]
+        
+        for x in sector_xs:
+            start = self.camera.apply_point_reverse((x, 0))
+            end = self.camera.apply_point_reverse((x, st.MAP_HEIGHT))
+            pg.draw.line(self.screen, st.GREEN, start, end)
+            
+        for y in sector_ys:
+            start = self.camera.apply_point_reverse((0, y))
+            end = self.camera.apply_point_reverse((st.MAP_WIDTH, y))
+            pg.draw.line(self.screen, st.GREEN, start, end)
                 
 
     
@@ -175,20 +191,7 @@ class Game:
 
         #pg.draw.rect(self.screen, (0, 255, 0), self.camera.apply_rect(self.qt_rect), 2)
         
-        # draw the sector boundaries
-        sector_xs = [x * st.SECTOR_WIDTH * st.TILESIZE for x in range(st.NO_SECTORS_W)]
-        sector_ys = [y * st.SECTOR_HEIGHT * st.TILESIZE for y in range(st.NO_SECTORS_H)]
-        
-        for x in sector_xs:
-            start = self.camera.apply_point_reverse((x, 0))
-            end = self.camera.apply_point_reverse((x, st.MAP_HEIGHT))
-            pg.draw.line(self.screen, st.GREEN, start, end)
-            
-        for y in sector_ys:
-            start = self.camera.apply_point_reverse((0, y))
-            end = self.camera.apply_point_reverse((st.MAP_WIDTH, y))
-            pg.draw.line(self.screen, st.GREEN, start, end)
-        
+        #self.draw_sectors()
         
         self.gui.draw()
         
@@ -203,6 +206,7 @@ class Game:
     def events(self):
         for event in pg.event.get():
             if event.type == pg.QUIT:
+                self.save_world_image()
                 self.running = False
             # MEMO: EXPORT THE PRESSED KEYS TO A FUNCTION
             if event.type == pg.KEYDOWN:

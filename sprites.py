@@ -60,7 +60,7 @@ class Player(Physics_object):
         self.pos = vec(x, y)
         
         self.speed = 0.5
-        self.friction = -0.12
+        self.friction = -0.2
         
         self.inventory = {}
         self.inventory_types = []
@@ -75,7 +75,7 @@ class Player(Physics_object):
         move_right = pressed[pg.K_d]
         
         self.acc.x = move_right - move_left       
-        self.acc.x *= self.speed       
+        self.acc.x *= self.speed  
         self.acc.x += self.vel.x * self.friction
         
         super().update(others)
@@ -118,8 +118,12 @@ class Block(Physics_object):
     def __init__(self, game, type_, x, y):
         self.game = game
         self.type = type_
-        self.image = pg.Surface((st.TILESIZE, st.TILESIZE))
-        self.image.fill(st.BLOCK_TYPES[self.type]['color'])
+        if 'image' in st.BLOCK_TYPES[self.type]:
+            image_no = st.BLOCK_TYPES[self.type]['image']
+            self.image = self.game.image_loader.blocks[image_no]
+        else:
+            self.image = pg.Surface((st.TILESIZE, st.TILESIZE))
+            self.image.fill(st.BLOCK_TYPES[self.type]['color'])
         super().__init__()
         self.game.all_sprites.add(self)
         self.game.blocks.add(self)
@@ -141,7 +145,7 @@ class Block(Physics_object):
                                              self.pos.y + st.TILESIZE)) == None):
                 self.age += 1
                 if self.age >= 600:
-                    #self.type = 'grass'
+                    self.type = 'grass'
                     self.image.fill(st.BLOCK_TYPES[self.type]['color'])
                     self.age = 0
         
@@ -184,24 +188,28 @@ class Block_drop(Physics_object):
 
     
     def update(self, others):
+        '''
         # if not in camera range, kill
         rect = pg.Rect((0, 0), (st.SCREEN_WIDTH, st.SCREEN_HEIGHT))
         rect.topleft = self.game.camera.apply_point(rect.topleft)
         if not self.rect.colliderect(rect):
             self.kill()
-            return
+            return'''
         
         # apply physics
         # exclude player from collision
         player = self.game.player 
-        sprites = [other for other in others if other != player]
+        sprites = [other for other in others if (other != player and 
+                                            not isinstance(other, Block_drop))]
         super().update(sprites)
                     
         # object is drawn towards player
         self_to_player = player.rect.center - self.pos  
         if self_to_player.length_squared() < st.TILESIZE_SQUARED * 3:
             self.gravity = NULL
-            self.pos += self_to_player.normalize() * 2     
+            self.pos += self_to_player.normalize() * 2
+        else:
+            self.gravity = GRAVITY                 
         
         # check for collision with player
         if pg.sprite.collide_rect(self, player):
@@ -277,3 +285,6 @@ class GUI:
                                     self.game.monitor_screen.get_height()))
         self.game.monitor_screen.blit(transformed_screen, (0, 0))
         pg.display.update()
+        
+
+        
